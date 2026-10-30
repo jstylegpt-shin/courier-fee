@@ -63,6 +63,7 @@ const API = "https://myjtrwfmdqyzslojyqsa.supabase.co/functions/v1/courier-api";
 const KEY = new URLSearchParams(location.hash.slice(1)).get("k") || "";
 const STATUS = {submitted:"확인 대기", confirmed:"확인", rejected:"반려"};
 const app = document.getElementById("app");
+const START = "2026-10"; // 10월분부터 시행
 let state = {month:null, rows:[], filter:"all", open:null, deadline:""};
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -80,7 +81,7 @@ async function call(body){
 }
 function months(){
   const n = new Date(Date.now() + 9*3600e3), out = [];
-  for (let i = 0; i < 12; i++){ const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth()-i, 1)); out.push(d.toISOString().slice(0,7)); }
+  for (let i = 0; i < 24; i++){ const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth()-i, 1)).toISOString().slice(0,7); if (d >= START) out.push(d); }
   return out;
 }
 
@@ -99,6 +100,7 @@ function render(){
   const subs = state.rows.filter(r => r.id);
   const total = subs.reduce((a,r) => a + r.amount, 0);
   const sup = subs.reduce((a,r) => a + r.support, 0);
+  const supOk = subs.filter(r => r.status === "confirmed").reduce((a,r) => a + r.support, 0);
   const noPhoto = subs.filter(r => !r.photo_count).length;
   const waiting = subs.filter(r => r.status === "submitted").length;
   const cnt = k => ({all:state.rows.length, missing:state.rows.length - subs.length, nophoto:noPhoto, submitted:waiting,
@@ -119,7 +121,7 @@ function render(){
     <div class="stat"><div>확인 대기</div><b>${waiting}</b></div>
     <div class="stat"><div>첨부 없음</div><b class="${noPhoto?"neg":""}">${noPhoto}</b></div>
     <div class="stat"><div>택배비 합계</div><b>${won(total)}</b></div>
-    <div class="stat"><div>지원액 (공제 입력)</div><b class="neg">${won(sup)}</b></div>
+    <div class="stat"><div>확인 건 지원액 (공제 입력)</div><b class="neg">${won(supOk)}</b></div>
   </div>
   <div class="filters">${F.map(([k,l]) => `<button data-f="${k}" class="${state.filter===k?"on":""}">${l} ${cnt(k)}</button>`).join("")}</div>
   <div class="tw"><table>
@@ -181,8 +183,8 @@ async function openDetail(id){
 }
 
 function exportXlsx(){
-  const head = ["매장코드","매장명","택배비 월","반영 정산서","건수","택배비 합계","택배비 50% (공제 입력)","첨부(장)","상태","매장 메모"];
-  const rows = state.rows.map(r => [r.code, r.name, state.month, settleOf(state.month), r.id ? r.qty : 0, r.id ? r.amount : 0, r.id ? r.support : 0,
+  const head = ["매장코드","매장명","택배비 월","반영 정산서","건수","택배비 합계","택배비 50% (공제 입력, 확인 건만)","첨부(장)","상태","매장 메모"];
+  const rows = state.rows.map(r => [r.code, r.name, state.month, settleOf(state.month), r.id ? r.qty : 0, r.id ? r.amount : 0, r.status === "confirmed" ? r.support : 0,
     r.id ? r.photo_count : 0, r.id ? STATUS[r.status] : "미제출", r.memo || ""]);
   const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
   ws["!cols"] = [{wch:9},{wch:30},{wch:10},{wch:12},{wch:7},{wch:13},{wch:20},{wch:8},{wch:9},{wch:30}];
@@ -204,7 +206,8 @@ async function exportLinks(){
 
 const n = new Date(Date.now() + 9*3600e3);
 // 기본 표시: 16일(정산일)까지는 이번 정산서에 들어갈 전전월, 이후에는 취합 중인 전월
-load(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 2 : 1), 1)).toISOString().slice(0,7));
+const def = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 2 : 1), 1)).toISOString().slice(0,7);
+load(def < START ? START : def);
 </script>
 </body>
 </html>

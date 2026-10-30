@@ -6,6 +6,7 @@ const sql = postgres(Deno.env.get("SUPABASE_DB_URL")!, { prepare: false, max: 3 
 const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const BUCKET = "courier-receipts";
 const CAP = 250000;
+const START = "2026-10"; // 10월분부터 시행 (9월분 이전은 종이로 처리)
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -33,7 +34,7 @@ function isOpen(m: string) {
   const now = kstNow();
   const today = now.toISOString().slice(0, 10);
   const cur = ym(now);
-  if (m > cur) return false;             // 미래 월 불가
+  if (m > cur || m < START) return false;             // 미래 월 불가
   return today <= deadlineOf(m);         // 마감일 당일까지 가능
 }
 function openMonths() {
