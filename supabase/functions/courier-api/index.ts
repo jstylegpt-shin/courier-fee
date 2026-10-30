@@ -24,8 +24,11 @@ function addMonth(m: string, n: number) {
   const d = new Date(Date.UTC(y, mo - 1 + n, 1));
   return ym(d);
 }
-// m월분 마감: 다음달 5일 23:59:59 KST
-function deadlineOf(m: string) { return `${addMonth(m, 1)}-05`; }
+// m월분 마감: 다음달 말일 (KST). m월 택배비는 m+1월 정산서에 반영(익월 지원)
+function deadlineOf(m: string) {
+  const [y, mo] = addMonth(m, 2).split("-").map(Number);
+  return new Date(Date.UTC(y, mo - 1, 0)).toISOString().slice(0, 10);
+}
 function isOpen(m: string) {
   const now = kstNow();
   const today = now.toISOString().slice(0, 10);

@@ -69,6 +69,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const won = n => Number(n).toLocaleString("ko-KR", {maximumFractionDigits:1});
 const mLabel = m => `${m.slice(0,4)}년 ${Number(m.slice(5))}월`;
 const supportOf = a => -(a >= 500000 ? 250000 : a / 2);
+const addM = (m, n) => { const d = new Date(Date.UTC(+m.slice(0,4), +m.slice(5)-1+n, 1)); return d.toISOString().slice(0,7); };
+const settleOf = m => `${Number(addM(m,1).slice(5))}월 정산서`;
 
 async function call(body){
   const r = await fetch(API, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({...body, admin:KEY})});
@@ -105,7 +107,7 @@ function render(){
   const list = rowsFiltered();
   app.innerHTML = `
   <div class="top">
-    <div><h1>택배비 제출 현황</h1><small>${mLabel(state.month)}분 · 매장 마감 ${state.deadline} · 16일 정산 반영</small></div>
+    <div><h1>택배비 제출 현황</h1><small>${mLabel(state.month)} 택배비 · 매장 마감 ${state.deadline} · ${settleOf(state.month)} 반영 (${Number(addM(state.month,2).slice(5))}월 16일 정산)</small></div>
     <div class="tools">
       <select id="month">${months().map(m => `<option value="${m}" ${m===state.month?"selected":""}>${mLabel(m)}</option>`).join("")}</select>
       <button id="xls" class="pri">엑셀 다운로드</button>
@@ -179,14 +181,14 @@ async function openDetail(id){
 }
 
 function exportXlsx(){
-  const head = ["매장코드","매장명","정산월","건수","택배비 합계","택배비 50% (공제 입력)","첨부(장)","상태","매장 메모"];
-  const rows = state.rows.map(r => [r.code, r.name, state.month, r.id ? r.qty : 0, r.id ? r.amount : 0, r.id ? r.support : 0,
+  const head = ["매장코드","매장명","택배비 월","반영 정산서","건수","택배비 합계","택배비 50% (공제 입력)","첨부(장)","상태","매장 메모"];
+  const rows = state.rows.map(r => [r.code, r.name, state.month, settleOf(state.month), r.id ? r.qty : 0, r.id ? r.amount : 0, r.id ? r.support : 0,
     r.id ? r.photo_count : 0, r.id ? STATUS[r.status] : "미제출", r.memo || ""]);
   const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
-  ws["!cols"] = [{wch:9},{wch:30},{wch:9},{wch:7},{wch:13},{wch:20},{wch:8},{wch:9},{wch:30}];
-  for (let i = 2; i <= rows.length + 1; i++) ["E","F"].forEach(c => { if (ws[c+i]) ws[c+i].z = "#,##0;-#,##0"; });
+  ws["!cols"] = [{wch:9},{wch:30},{wch:10},{wch:12},{wch:7},{wch:13},{wch:20},{wch:8},{wch:9},{wch:30}];
+  for (let i = 2; i <= rows.length + 1; i++) ["F","G"].forEach(c => { if (ws[c+i]) ws[c+i].z = "#,##0;-#,##0"; });
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "택배비");
-  XLSX.writeFile(wb, `택배비_${state.month}.xlsx`);
+  XLSX.writeFile(wb, `택배비_${state.month}_${settleOf(state.month).replace(" ","")}반영.xlsx`);
 }
 
 async function exportLinks(){
@@ -201,8 +203,8 @@ async function exportLinks(){
 }
 
 const n = new Date(Date.now() + 9*3600e3);
-// 16일(정산일)까지는 전월, 이후에는 당월을 기본으로 표시
-load(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 1 : 0), 1)).toISOString().slice(0,7));
+// 기본 표시: 16일(정산일)까지는 이번 정산서에 들어갈 전전월, 이후에는 취합 중인 전월
+load(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 2 : 1), 1)).toISOString().slice(0,7));
 </script>
 </body>
 </html>
