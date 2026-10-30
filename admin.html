@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>택배비 제출 현황</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f3ef;--card:#fff;--line:#e3e1da;--text:#1f1e1b;--sub:#6b6a64;--muted:#9a988f;--hover:#f7f6f2;
+--accent:#1f5fbf;--accent-on:#fff;--danger:#b42318;--danger-bg:#fdecea;--ok:#2e6b1f;--ok-bg:#e8f3df;--warn:#8a5a00;--warn-bg:#fbf0d9;--info-bg:#e6effb;--r:8px}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#21201d;--line:#34332f;--text:#efeee9;--sub:#aaa89f;--muted:#7b7970;--hover:#2a2925;
+--accent:#5c9bf0;--accent-on:#0b1a33;--danger:#f08a80;--danger-bg:#3a1d1a;--ok:#9fd27f;--ok-bg:#1f3016;--warn:#f0c46a;--warn-bg:#3a2d12;--info-bg:#1a2a40}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans KR",system-ui,sans-serif;font-size:14px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 60px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:20px;margin:0;font-weight:700}.top small{color:var(--sub);font-size:12px}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+select,button,input{font:inherit;color:var(--text)}
+select,input{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+button{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px 12px;cursor:pointer}
+button:hover{background:var(--hover)}
+button.pri{background:var(--accent);color:var(--accent-on);border-color:var(--accent);font-weight:500}
+button.dng{color:var(--danger);border-color:var(--danger)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.stat div{font-size:12px;color:var(--sub)}.stat b{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums}
+.neg{color:var(--danger)}
+.filters{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.filters button.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.tw{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th{font-weight:500;color:var(--sub);font-size:12px;text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+tr.row{cursor:pointer}tr.row:hover td{background:var(--hover)}tr.sel td{background:var(--info-bg)}
+.r{text-align:right}.c{text-align:center}.code{color:var(--sub);font-size:12px}
+.mut{color:var(--muted)}
+.pill{font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap;font-weight:500;display:inline-block}
+.p-submitted{background:var(--info-bg);color:var(--accent)}.p-confirmed{background:var(--ok-bg);color:var(--ok)}
+.p-rejected,.p-none-photo{background:var(--danger-bg);color:var(--danger)}.p-missing{background:var(--hover);color:var(--sub)}.p-cap{background:var(--warn-bg);color:var(--warn)}
+tr.detail td{background:var(--bg);padding:16px}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px}
+@media (max-width:760px){.dgrid{grid-template-columns:1fr}}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.thumbs a{display:block;aspect-ratio:1;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:var(--card)}
+.thumbs img{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs .pdf{display:flex;align-items:center;justify-content:center;height:100%;color:var(--sub)}
+.side label{display:block;font-size:12px;color:var(--sub);margin:8px 0 4px}.side input{width:100%}
+.side .btns{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+.memo{font-size:13px;color:var(--sub);margin-top:8px}
+.err{color:var(--danger);font-size:12px;margin-top:6px}
+.load{text-align:center;color:var(--sub);padding:60px 0}
+tfoot td{font-weight:700;border-bottom:0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="load">불러오는 중…</div></div>
+<script>
+const API = "https://myjtrwfmdqyzslojyqsa.supabase.co/functions/v1/courier-api";
+const KEY = new URLSearchParams(location.hash.slice(1)).get("k") || "";
+const STATUS = {submitted:"확인 대기", confirmed:"확인", rejected:"반려"};
+const app = document.getElementById("app");
+let state = {month:null, rows:[], filter:"all", open:null, deadline:""};
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const won = n => Number(n).toLocaleString("ko-KR", {maximumFractionDigits:1});
+const mLabel = m => `${m.slice(0,4)}년 ${Number(m.slice(5))}월`;
+const supportOf = a => -(a >= 500000 ? 250000 : a / 2);
+
+async function call(body){
+  const r = await fetch(API, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({...body, admin:KEY})});
+  const j = await r.json().catch(() => ({error:"서버 응답을 읽을 수 없습니다."}));
+  if (!r.ok) throw new Error(j.error || "오류가 발생했습니다.");
+  return j;
+}
+function months(){
+  const n = new Date(Date.now() + 9*3600e3), out = [];
+  for (let i = 0; i < 12; i++){ const d = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth()-i, 1)); out.push(d.toISOString().slice(0,7)); }
+  return out;
+}
+
+async function load(month){
+  try { const j = await call({action:"admin_list", month}); state.month = j.month; state.rows = j.rows; state.deadline = j.deadline; render(); }
+  catch(e){ app.innerHTML = `<div class="load">${esc(e.message)}<br>본사용 링크로 접속해 주세요.</div>`; }
+}
+
+function rowsFiltered(){
+  const f = state.filter;
+  return state.rows.filter(r => f === "all" || (f === "missing" && !r.id) || (f === "nophoto" && r.id && !r.photo_count)
+    || (f === "submitted" && r.status === "submitted") || (f === "rejected" && r.status === "rejected") || (f === "confirmed" && r.status === "confirmed"));
+}
+
+function render(){
+  const subs = state.rows.filter(r => r.id);
+  const total = subs.reduce((a,r) => a + r.amount, 0);
+  const sup = subs.reduce((a,r) => a + r.support, 0);
+  const noPhoto = subs.filter(r => !r.photo_count).length;
+  const waiting = subs.filter(r => r.status === "submitted").length;
+  const cnt = k => ({all:state.rows.length, missing:state.rows.length - subs.length, nophoto:noPhoto, submitted:waiting,
+    rejected:subs.filter(r=>r.status==="rejected").length, confirmed:subs.filter(r=>r.status==="confirmed").length})[k];
+  const F = [["all","전체"],["missing","미제출"],["submitted","확인 대기"],["nophoto","첨부 없음"],["rejected","반려"],["confirmed","확인"]];
+  const list = rowsFiltered();
+  app.innerHTML = `
+  <div class="top">
+    <div><h1>택배비 제출 현황</h1><small>${mLabel(state.month)}분 · 매장 마감 ${state.deadline} · 16일 정산 반영</small></div>
+    <div class="tools">
+      <select id="month">${months().map(m => `<option value="${m}" ${m===state.month?"selected":""}>${mLabel(m)}</option>`).join("")}</select>
+      <button id="xls" class="pri">엑셀 다운로드</button>
+      <button id="links">매장 링크 목록</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div>제출</div><b>${subs.length} / ${state.rows.length}</b></div>
+    <div class="stat"><div>확인 대기</div><b>${waiting}</b></div>
+    <div class="stat"><div>첨부 없음</div><b class="${noPhoto?"neg":""}">${noPhoto}</b></div>
+    <div class="stat"><div>택배비 합계</div><b>${won(total)}</b></div>
+    <div class="stat"><div>지원액 (공제 입력)</div><b class="neg">${won(sup)}</b></div>
+  </div>
+  <div class="filters">${F.map(([k,l]) => `<button data-f="${k}" class="${state.filter===k?"on":""}">${l} ${cnt(k)}</button>`).join("")}</div>
+  <div class="tw"><table>
+    <thead><tr><th style="width:64px">코드</th><th>매장명</th><th class="r">건수</th><th class="r">택배비 합계</th><th class="r">50% 지원</th><th class="c">첨부</th><th class="c">상태</th><th>제출일</th></tr></thead>
+    <tbody>${list.map(r => rowHtml(r)).join("") || `<tr><td colspan="8" class="c mut" style="padding:30px">해당하는 매장이 없습니다.</td></tr>`}</tbody>
+    <tfoot><tr><td></td><td>합계 (${subs.length}개 매장)</td><td class="r">${won(subs.reduce((a,r)=>a+r.qty,0))}</td><td class="r">${won(total)}</td><td class="r neg">${won(sup)}</td><td colspan="3"></td></tr></tfoot>
+  </table></div>`;
+  document.getElementById("month").onchange = e => { state.open = null; load(e.target.value); };
+  document.getElementById("xls").onclick = exportXlsx;
+  document.getElementById("links").onclick = exportLinks;
+  app.querySelectorAll("[data-f]").forEach(b => b.onclick = () => { state.filter = b.dataset.f; render(); });
+  app.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => toggle(tr.dataset.id));
+  if (state.open) openDetail(state.open);
+}
+
+function rowHtml(r){
+  if (!r.id) return `<tr><td class="code">${r.code}</td><td>${esc(r.name)}</td><td class="r mut">-</td><td class="r mut">-</td><td class="r mut">-</td><td class="c mut">-</td><td class="c"><span class="pill p-missing">미제출</span></td><td class="mut">-</td></tr>`;
+  const cap = r.amount >= 500000;
+  return `<tr class="row ${state.open===r.id?"sel":""}" data-id="${r.id}">
+    <td class="code">${r.code}</td><td>${esc(r.name)}</td><td class="r">${won(r.qty)}</td><td class="r">${won(r.amount)}</td>
+    <td class="r neg">${won(r.support)}${cap ? ` <span class="pill p-cap">상한</span>` : ""}</td>
+    <td class="c">${r.photo_count ? `${r.photo_count}장` : `<span class="pill p-none-photo">없음</span>`}</td>
+    <td class="c"><span class="pill p-${r.status}">${STATUS[r.status]}</span></td>
+    <td class="mut">${new Date(r.updated_at).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"})}</td></tr>
+    ${state.open===r.id ? `<tr class="detail"><td colspan="8" id="detail"><div class="mut">사진 불러오는 중…</div></td></tr>` : ""}`;
+}
+
+function toggle(id){ state.open = state.open === id ? null : id; render(); }
+
+async function openDetail(id){
+  const r = state.rows.find(x => x.id === id), box = document.getElementById("detail");
+  if (!r || !box) return;
+  let photos = [];
+  try { photos = (await call({action:"admin_detail", id})).photos; } catch(e){ box.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
+  box.innerHTML = `<div class="dgrid">
+    <div>
+      <div class="thumbs">${photos.map(p => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.pdf ? `<div class="pdf">PDF 열기</div>` : `<img src="${esc(p.url)}" alt="증빙 사진">`}</a>`).join("") || `<div class="err">첨부된 사진이 없습니다.</div>`}</div>
+      ${r.memo ? `<div class="memo">매장 메모: ${esc(r.memo)}</div>` : ""}
+      ${r.status==="rejected" ? `<div class="memo">반려 사유: ${esc(r.reject_reason)}</div>` : ""}
+    </div>
+    <div class="side">
+      <label>택배 수량 (건)</label><input id="eq" inputmode="numeric" value="${r.qty}">
+      <label>택배비 합계 (원)</label><input id="ea" inputmode="numeric" value="${r.amount}">
+      <div class="memo">지원액 <b class="neg" id="es">${won(supportOf(r.amount))}</b></div>
+      <label>반려 사유 (반려할 때만)</label><input id="er" placeholder="운송장 사진이 흐립니다" value="${esc(r.reject_reason || "")}">
+      <div class="btns"><button class="pri" data-s="confirmed">확인</button><button class="dng" data-s="rejected">반려</button><button data-s="submitted">대기로</button></div>
+      <div class="err" id="ee"></div>
+    </div></div>`;
+  const ea = document.getElementById("ea");
+  ea.oninput = () => document.getElementById("es").textContent = won(supportOf(Number(ea.value.replace(/[^0-9]/g,""))||0));
+  box.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => {
+    const qty = Number(document.getElementById("eq").value.replace(/[^0-9]/g,""));
+    const amount = Number(ea.value.replace(/[^0-9]/g,""));
+    const reason = document.getElementById("er").value.trim();
+    if (b.dataset.s === "rejected" && !reason) { document.getElementById("ee").textContent = "반려 사유를 입력해 주세요."; return; }
+    try { await call({action:"admin_update", id, status:b.dataset.s, qty, amount, reject_reason:reason}); state.open = null; load(state.month); }
+    catch(e){ document.getElementById("ee").textContent = e.message; }
+  });
+}
+
+function exportXlsx(){
+  const head = ["매장코드","매장명","정산월","건수","택배비 합계","택배비 50% (공제 입력)","첨부(장)","상태","매장 메모"];
+  const rows = state.rows.map(r => [r.code, r.name, state.month, r.id ? r.qty : 0, r.id ? r.amount : 0, r.id ? r.support : 0,
+    r.id ? r.photo_count : 0, r.id ? STATUS[r.status] : "미제출", r.memo || ""]);
+  const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+  ws["!cols"] = [{wch:9},{wch:30},{wch:9},{wch:7},{wch:13},{wch:20},{wch:8},{wch:9},{wch:30}];
+  for (let i = 2; i <= rows.length + 1; i++) ["E","F"].forEach(c => { if (ws[c+i]) ws[c+i].z = "#,##0;-#,##0"; });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "택배비");
+  XLSX.writeFile(wb, `택배비_${state.month}.xlsx`);
+}
+
+async function exportLinks(){
+  try {
+    const { rows } = await call({action:"admin_links"});
+    const base = location.href.split("#")[0].replace(/admin\.html.*$/, "");
+    const ws = XLSX.utils.aoa_to_sheet([["매장코드","매장명","매장 전용 링크"], ...rows.map(r => [r.code, r.name, `${base}#t=${r.token}`])]);
+    ws["!cols"] = [{wch:9},{wch:30},{wch:90}];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "매장 링크");
+    XLSX.writeFile(wb, "매장별_택배비_제출링크.xlsx");
+  } catch(e){ alert(e.message); }
+}
+
+const n = new Date(Date.now() + 9*3600e3);
+// 16일(정산일)까지는 전월, 이후에는 당월을 기본으로 표시
+load(new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 1 : 0), 1)).toISOString().slice(0,7));
+</script>
+</body>
+</html>

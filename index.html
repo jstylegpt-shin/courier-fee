@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>택배비 제출</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f3ef;--card:#fff;--line:#e3e1da;--text:#1f1e1b;--sub:#6b6a64;--muted:#9a988f;
+--accent:#1f5fbf;--accent-on:#fff;--danger:#b42318;--danger-bg:#fdecea;--ok:#2e6b1f;--ok-bg:#e8f3df;
+--warn:#8a5a00;--warn-bg:#fbf0d9;--info-bg:#e6effb;--r:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#161614;--card:#21201d;--line:#34332f;--text:#efeee9;--sub:#aaa89f;--muted:#7b7970;
+--accent:#5c9bf0;--accent-on:#0b1a33;--danger:#f08a80;--danger-bg:#3a1d1a;--ok:#9fd27f;--ok-bg:#1f3016;--warn:#f0c46a;--warn-bg:#3a2d12;--info-bg:#1a2a40}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans KR",system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-text-size-adjust:100%}
+.wrap{max-width:480px;margin:0 auto;padding:16px 16px 48px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.brand{font-size:12px;color:var(--sub);letter-spacing:.02em}
+h1{font-size:21px;margin:2px 0 0;font-weight:700}
+.dead{font-size:13px;color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 10px;margin-top:10px;display:inline-block}
+label.f{display:block;font-size:13px;color:var(--sub);margin:16px 0 6px}
+input[type=text],select,textarea{width:100%;font:inherit;font-size:16px;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 12px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.sup{margin-top:8px;font-size:14px}.sup b{font-size:17px}
+.photos{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:var(--r);overflow:hidden;background:var(--bg);border:1px solid var(--line)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .pdf{display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--sub)}
+.ph button{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:24px;padding:0;cursor:pointer}
+.add{aspect-ratio:1;border:1.5px dashed var(--muted);border-radius:var(--r);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--sub);font-size:12px;cursor:pointer;background:transparent}
+.add span{font-size:24px;line-height:1}
+.notice{background:var(--danger-bg);color:var(--danger);border-radius:var(--r);padding:12px;font-size:13px;line-height:1.65;margin-top:14px}
+.notice b{display:block;margin-bottom:2px}
+.agree{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:12px;cursor:pointer}
+.agree input{width:20px;height:20px;margin:1px 0 0;flex:none;accent-color:var(--accent)}
+.btn{width:100%;margin-top:18px;font:inherit;font-weight:700;font-size:16px;padding:14px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-on);cursor:pointer}
+.btn:disabled{opacity:.6}
+.err{color:var(--danger);font-size:13px;margin-top:8px;min-height:0}
+.msg{border-radius:var(--r);padding:12px;font-size:14px;margin-top:14px}
+.msg.ok{background:var(--ok-bg);color:var(--ok)}.msg.bad{background:var(--danger-bg);color:var(--danger)}
+.rej{background:var(--danger-bg);color:var(--danger);border-radius:var(--r);padding:10px 12px;font-size:13px;margin-top:12px}
+h2{font-size:15px;margin:26px 0 8px;font-weight:700}
+.hist{background:var(--card);border:1px solid var(--line);border-radius:16px}
+.hrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid var(--line);font-size:14px}
+.hrow:first-child{border-top:0}
+.hrow small{display:block;color:var(--sub);font-size:12px}
+.pill{font-size:12px;padding:3px 9px;border-radius:999px;white-space:nowrap;font-weight:500}
+.p-submitted{background:var(--info-bg);color:var(--accent)}.p-confirmed{background:var(--ok-bg);color:var(--ok)}.p-rejected{background:var(--danger-bg);color:var(--danger)}
+.empty{color:var(--sub);font-size:14px;padding:14px}
+.locked{color:var(--sub);font-size:14px;margin-top:12px}
+.load{text-align:center;color:var(--sub);padding:60px 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="load">불러오는 중…</div></div>
+<input type="file" id="file" accept="image/*,application/pdf" multiple hidden>
+<script>
+const API = "https://myjtrwfmdqyzslojyqsa.supabase.co/functions/v1/courier-api";
+const STATUS = {submitted:"본사 확인 대기", confirmed:"확인완료", rejected:"반려"};
+const params = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+const TOKEN = params.get("t") || "";
+const app = document.getElementById("app");
+const fileInput = document.getElementById("file");
+let data = null, newFiles = [], keep = [], current = null;
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const won = n => Number(n).toLocaleString("ko-KR", {maximumFractionDigits:1});
+const mLabel = m => `${m.slice(0,4)}년 ${Number(m.slice(5))}월`;
+const dLabel = d => `${Number(d.slice(5,7))}월 ${Number(d.slice(8))}일`;
+const supportOf = a => a >= 500000 ? 250000 : a / 2;
+const digits = v => v.replace(/[^0-9]/g, "");
+
+async function call(body){
+  const r = await fetch(API, {method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({error:"서버 응답을 읽을 수 없습니다."}));
+  if (!r.ok) throw new Error(j.error || "오류가 발생했습니다.");
+  return j;
+}
+
+async function load(msg){
+  if (!/^[0-9a-f]{32}$/.test(TOKEN)) { app.innerHTML = `<div class="card"><h1>링크를 확인해 주세요</h1><p class="locked">본사에서 받은 매장 전용 링크로 접속해 주세요.</p></div>`; return; }
+  try { data = await call({action:"store_info", token:TOKEN}); }
+  catch(e){ app.innerHTML = `<div class="card"><h1>접속할 수 없습니다</h1><p class="locked">${esc(e.message)}</p></div>`; return; }
+  document.title = `택배비 제출 · ${data.store.name}`;
+  const m = data.months.find(x => x.month === current) ? current : data.months[0]?.month;
+  selectMonth(m, msg);
+}
+
+function selectMonth(m, msg){
+  current = m || null;
+  newFiles = [];
+  const sub = data.submissions.find(s => s.month === current);
+  keep = sub ? sub.photos.map(p => p.id) : [];
+  render(msg);
+}
+
+function photoTiles(){
+  const sub = data.submissions.find(s => s.month === current);
+  const olds = (sub?.photos || []).filter(p => keep.includes(p.id)).map(p => `
+    <div class="ph">${p.pdf ? `<div class="pdf">PDF</div>` : `<img src="${esc(p.url)}" alt="">`}
+    <button type="button" aria-label="사진 삭제" data-del-old="${p.id}">×</button></div>`);
+  const news = newFiles.map((f,i) => `
+    <div class="ph">${f.type === "application/pdf" ? `<div class="pdf">PDF</div>` : `<img src="${f._url}" alt="">`}
+    <button type="button" aria-label="사진 삭제" data-del-new="${i}">×</button></div>`);
+  return [...olds, ...news, `<button type="button" class="add" id="addBtn"><span>+</span>사진 추가</button>`].join("");
+}
+
+function render(msg){
+  const sub = data.submissions.find(s => s.month === current);
+  const mInfo = data.months.find(x => x.month === current);
+  let form = "";
+  if (!current){
+    form = `<p class="locked">지금은 제출할 수 있는 월이 없습니다. 매월 5일까지 전월분을 제출할 수 있습니다.</p>`;
+  } else {
+    form = `
+    <div class="dead">${mLabel(current)}분 마감 ${dLabel(mInfo.deadline)}</div>
+    ${sub?.status === "rejected" ? `<div class="rej"><b>본사 반려</b> ${esc(sub.reject_reason)}<br>내용을 고쳐서 다시 제출해 주세요.</div>` : ""}
+    <label class="f" for="month">정산 월</label>
+    <select id="month">${data.months.map(x => `<option value="${x.month}" ${x.month===current?"selected":""}>${mLabel(x.month)}</option>`).join("")}</select>
+    <label class="f" for="qty">택배 수량 (건)</label>
+    <input type="text" id="qty" inputmode="numeric" placeholder="0" value="${sub ? won(sub.qty) : ""}">
+    <label class="f" for="amount">택배비 합계 (원)</label>
+    <input type="text" id="amount" inputmode="numeric" placeholder="0" value="${sub ? won(sub.amount) : ""}">
+    <div class="sup">본사 지원 예정 <b id="sup">0원</b></div>
+    <label class="f">증빙 사진 (운송장·영수증·세금계산서)</label>
+    <div class="photos" id="photos">${photoTiles()}</div>
+    <div class="notice"><b>꼭 확인해 주세요</b>
+      · 증빙 사진을 첨부하지 않거나 허위 사진을 올리면 택배비를 지원받을 수 없습니다.<br>
+      · 고객 발송 건이 아닌 택배비를 청구한 사실이 확인되면 계약 위반으로 처리됩니다.</div>
+    <label class="agree"><input type="checkbox" id="agree"> 위 내용을 확인했으며, 고객 발송 건만 제출합니다.</label>
+    <label class="f" for="memo">메모 (선택)</label>
+    <input type="text" id="memo" maxlength="500" placeholder="반품 3건 포함" value="${esc(sub?.memo || "")}">
+    <div class="err" id="err"></div>
+    <button class="btn" id="submit">${sub ? "수정해서 다시 제출" : "제출하기"}</button>`;
+  }
+  const hist = data.submissions.length ? data.submissions.map(s => `
+    <div class="hrow"><div>${mLabel(s.month)}<small>${won(s.qty)}건 · ${won(s.amount)}원 · 지원 ${won(-s.support)}원</small></div>
+    <span class="pill p-${s.status}">${STATUS[s.status]}</span></div>`).join("") : `<div class="empty">아직 제출한 내역이 없습니다.</div>`;
+  app.innerHTML = `
+    <div class="card">
+      <div class="brand">아이러브제이 택배비 제출</div>
+      <h1>${esc(data.store.name)}</h1>
+      ${msg ? `<div class="msg ${msg.ok?"ok":"bad"}">${esc(msg.text)}</div>` : ""}
+      ${form}
+    </div>
+    <h2>내 제출 내역</h2>
+    <div class="hist">${hist}</div>`;
+  bind();
+}
+
+function bind(){
+  const $ = id => document.getElementById(id);
+  if (!current) return;
+  const upd = () => { const a = Number(digits($("amount").value)) || 0; $("sup").textContent = won(supportOf(a)) + "원"; };
+  ["qty","amount"].forEach(id => $(id).addEventListener("input", e => {
+    const d = digits(e.target.value); e.target.value = d ? Number(d).toLocaleString("ko-KR") : ""; if (id==="amount") upd(); $("err").textContent = "";
+  }));
+  upd();
+  $("month").addEventListener("change", e => selectMonth(e.target.value));
+  $("addBtn").addEventListener("click", () => fileInput.click());
+  $("photos").addEventListener("click", e => {
+    const o = e.target.dataset.delOld, n = e.target.dataset.delNew;
+    if (o) { keep = keep.filter(x => x !== o); refreshPhotos(); }
+    if (n !== undefined) { URL.revokeObjectURL(newFiles[n]._url); newFiles.splice(Number(n),1); refreshPhotos(); }
+  });
+  $("agree").addEventListener("change", () => $("err").textContent = "");
+  $("submit").addEventListener("click", submit);
+}
+function refreshPhotos(){
+  document.getElementById("photos").innerHTML = photoTiles();
+  document.getElementById("addBtn").addEventListener("click", () => fileInput.click());
+  document.getElementById("err").textContent = "";
+}
+
+fileInput.addEventListener("change", async () => {
+  for (const f of fileInput.files) {
+    const c = await shrink(f);
+    c._url = URL.createObjectURL(c);
+    newFiles.push(c);
+  }
+  fileInput.value = "";
+  refreshPhotos();
+});
+
+// 큰 사진은 업로드 전에 줄이기 (실패하면 원본 그대로)
+async function shrink(f){
+  if (!f.type.startsWith("image/") || f.size < 600*1024) return f;
+  try {
+    const bmp = await createImageBitmap(f);
+    const s = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width*s); cv.height = Math.round(bmp.height*s);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(r => cv.toBlob(r, "image/jpeg", 0.85));
+    return blob ? new File([blob], "photo.jpg", {type:"image/jpeg"}) : f;
+  } catch { return f; }
+}
+
+async function submit(){
+  const $ = id => document.getElementById(id);
+  const err = t => { $("err").textContent = t; };
+  const qty = digits($("qty").value), amount = digits($("amount").value);
+  if (qty === "") return err("택배 수량을 입력해 주세요.");
+  if (amount === "") return err("택배비 합계를 입력해 주세요.");
+  if (keep.length + newFiles.length === 0) return err("증빙 사진을 첨부해 주세요. 사진이 없으면 제출할 수 없습니다.");
+  if (!$("agree").checked) return err("안내 사항을 확인하고 체크해 주세요.");
+  const fd = new FormData();
+  fd.append("action","store_submit"); fd.append("token",TOKEN); fd.append("month",current);
+  fd.append("qty",qty); fd.append("amount",amount); fd.append("memo",$("memo").value.trim());
+  fd.append("agree","true"); fd.append("keep",JSON.stringify(keep));
+  newFiles.forEach(f => fd.append("files", f, f.name || "photo"));
+  const b = $("submit"); b.disabled = true; b.textContent = "올리는 중…";
+  try {
+    const r = await fetch(API, {method:"POST", body:fd});
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "제출하지 못했습니다. 다시 시도해 주세요.");
+    newFiles.forEach(f => URL.revokeObjectURL(f._url));
+    await load({ok:true, text:`${mLabel(current)}분 제출 완료. 본사 지원 예정 ${won(-j.support)}원`});
+    window.scrollTo({top:0, behavior:"smooth"});
+  } catch(e){ b.disabled = false; b.textContent = "제출하기"; err(e.message); }
+}
+load();
+</script>
+</body>
+</html>
