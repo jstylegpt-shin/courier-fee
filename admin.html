@@ -54,10 +54,33 @@ tr.detail td{background:var(--bg);padding:16px}
 .err{color:var(--danger);font-size:12px;margin-top:6px}
 .load{text-align:center;color:var(--sub);padding:60px 0}
 tfoot td{font-weight:700;border-bottom:0}
+.thumbs a{position:relative;cursor:zoom-in}
+.thumbs .no{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:1px 6px;border-radius:999px}
+.lb{position:fixed;inset:0;z-index:50;background:rgba(10,10,10,.92);display:none;flex-direction:column;color:#fff;user-select:none}
+.lb.on{display:flex}
+.lb-top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;font-size:14px}
+.lb-top .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lb-top a,.lb-top button{color:#fff;background:rgba(255,255,255,.12);border:0;border-radius:8px;padding:7px 12px;font-size:13px;text-decoration:none;cursor:pointer;white-space:nowrap}
+.lb-stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;min-height:0;padding:0 64px 12px}
+.lb-stage img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;background:#fff}
+.lb-stage iframe{width:100%;height:100%;border:0;background:#fff;border-radius:4px}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;font-size:26px;line-height:48px;padding:0;cursor:pointer}
+.lb-nav:hover{background:rgba(255,255,255,.28)}.lb-nav[hidden]{display:none}
+.lb-prev{left:10px}.lb-next{right:10px}
+.lb-strip{display:flex;gap:6px;justify-content:center;padding:0 16px 14px;overflow-x:auto}
+.lb-strip button{flex:none;width:52px;height:52px;padding:0;border-radius:6px;overflow:hidden;border:2px solid transparent;background:#333;cursor:pointer;opacity:.6;color:#ccc;font-size:11px}
+.lb-strip button.cur{border-color:#fff;opacity:1}
+.lb-strip img{width:100%;height:100%;object-fit:cover;display:block}
+@media (max-width:600px){.lb-stage{padding:0 8px 12px}.lb-nav{width:40px;height:40px;line-height:40px;font-size:22px}}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"><div class="load">불러오는 중…</div></div>
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="증빙 사진 보기">
+  <div class="lb-top"><div class="t" id="lbTitle"></div><div style="display:flex;gap:6px"><a id="lbOrig" target="_blank" rel="noopener">원본 새 창</a><button id="lbClose" aria-label="닫기">닫기 ✕</button></div></div>
+  <div class="lb-stage" id="lbStage"><button class="lb-nav lb-prev" id="lbPrev" aria-label="이전">‹</button><div id="lbBody" style="height:100%;width:100%;display:flex;align-items:center;justify-content:center"></div><button class="lb-nav lb-next" id="lbNext" aria-label="다음">›</button></div>
+  <div class="lb-strip" id="lbStrip"></div>
+</div>
 <script>
 const API = "https://myjtrwfmdqyzslojyqsa.supabase.co/functions/v1/courier-api";
 const KEY = new URLSearchParams(location.hash.slice(1)).get("k") || "";
@@ -158,7 +181,7 @@ async function openDetail(id){
   try { photos = (await call({action:"admin_detail", id})).photos; } catch(e){ box.innerHTML = `<div class="err">${esc(e.message)}</div>`; return; }
   box.innerHTML = `<div class="dgrid">
     <div>
-      <div class="thumbs">${photos.map(p => `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.pdf ? `<div class="pdf">PDF 열기</div>` : `<img src="${esc(p.url)}" alt="증빙 사진">`}</a>`).join("") || `<div class="err">첨부된 사진이 없습니다.</div>`}</div>
+      <div class="thumbs">${photos.map((p,i) => `<a href="${esc(p.url)}" data-lb="${i}">${p.pdf ? `<div class="pdf">PDF</div>` : `<img src="${esc(p.url)}" alt="증빙 사진">`}<span class="no">${i+1}/${photos.length}</span></a>`).join("") || `<div class="err">첨부된 사진이 없습니다.</div>`}</div>
       ${r.memo ? `<div class="memo">매장 메모: ${esc(r.memo)}</div>` : ""}
       ${r.status==="rejected" ? `<div class="memo">반려 사유: ${esc(r.reject_reason)}</div>` : ""}
     </div>
@@ -170,6 +193,7 @@ async function openDetail(id){
       <div class="btns"><button class="pri" data-s="confirmed">확인</button><button class="dng" data-s="rejected">반려</button><button data-s="submitted">대기로</button></div>
       <div class="err" id="ee"></div>
     </div></div>`;
+  box.querySelectorAll("[data-lb]").forEach(el => el.onclick = e => { e.preventDefault(); lbOpen(photos, Number(el.dataset.lb), `${r.code} ${r.name}`); });
   const ea = document.getElementById("ea");
   ea.oninput = () => document.getElementById("es").textContent = won(supportOf(Number(ea.value.replace(/[^0-9]/g,""))||0));
   box.querySelectorAll("[data-s]").forEach(b => b.onclick = async () => {
@@ -204,6 +228,47 @@ async function exportLinks(){
   } catch(e){ alert(e.message); }
 }
 
+
+// ---- 첨부 사진 뷰어 (좌우 넘기기) ----
+const LB = {list:[], i:0, title:""};
+const lbEl = id => document.getElementById(id);
+function lbOpen(list, i, title){
+  if (!list.length) return;
+  LB.list = list; LB.i = i; LB.title = title;
+  lbEl("lbStrip").innerHTML = list.length > 1 ? list.map((p,k) => `<button data-k="${k}" aria-label="${k+1}번째">${p.pdf ? "PDF" : `<img src="${esc(p.url)}" alt="">`}</button>`).join("") : "";
+  lbEl("lbStrip").querySelectorAll("[data-k]").forEach(b => b.onclick = () => lbGo(Number(b.dataset.k)));
+  lbEl("lb").classList.add("on"); document.body.style.overflow = "hidden";
+  lbShow();
+}
+function lbShow(){
+  const p = LB.list[LB.i], n = LB.list.length;
+  lbEl("lbTitle").textContent = `${LB.title} · ${LB.i+1} / ${n}`;
+  lbEl("lbOrig").href = p.url || "#";
+  lbEl("lbBody").innerHTML = !p.url ? `<div>파일을 불러올 수 없습니다. 새로고침해 주세요.</div>`
+    : p.pdf ? `<iframe src="${esc(p.url)}" title="PDF"></iframe>` : `<img src="${esc(p.url)}" alt="증빙 사진 ${LB.i+1}">`;
+  lbEl("lbPrev").hidden = lbEl("lbNext").hidden = n < 2;
+  lbEl("lbStrip").querySelectorAll("[data-k]").forEach(b => b.classList.toggle("cur", Number(b.dataset.k) === LB.i));
+  const cur = lbEl("lbStrip").querySelector(".cur"); if (cur) cur.scrollIntoView({block:"nearest", inline:"center"});
+  [LB.i+1, LB.i-1].forEach(k => { const q = LB.list[(k+n)%n]; if (q && !q.pdf && q.url) new Image().src = q.url; });
+}
+function lbGo(i){ const n = LB.list.length; LB.i = (i + n) % n; lbShow(); }
+function lbClose(){ lbEl("lb").classList.remove("on"); lbEl("lbBody").innerHTML = ""; document.body.style.overflow = ""; }
+lbEl("lbPrev").onclick = e => { e.stopPropagation(); lbGo(LB.i - 1); };
+lbEl("lbNext").onclick = e => { e.stopPropagation(); lbGo(LB.i + 1); };
+lbEl("lbClose").onclick = lbClose;
+lbEl("lbStage").onclick = e => { if (e.target.id === "lbStage" || e.target.id === "lbBody") lbClose(); };
+document.addEventListener("keydown", e => {
+  if (!lbEl("lb").classList.contains("on")) return;
+  if (e.key === "ArrowLeft") lbGo(LB.i - 1);
+  else if (e.key === "ArrowRight") lbGo(LB.i + 1);
+  else if (e.key === "Escape") lbClose();
+});
+let lbX = null;
+lbEl("lbStage").addEventListener("touchstart", e => { lbX = e.touches[0].clientX; }, {passive:true});
+lbEl("lbStage").addEventListener("touchend", e => {
+  if (lbX === null) return; const d = e.changedTouches[0].clientX - lbX; lbX = null;
+  if (Math.abs(d) > 50) lbGo(LB.i + (d < 0 ? 1 : -1));
+});
 const n = new Date(Date.now() + 9*3600e3);
 // 기본 표시: 16일(정산일)까지는 이번 정산서에 들어갈 전전월, 이후에는 취합 중인 전월
 const def = new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth() - (n.getUTCDate() <= 16 ? 2 : 1), 1)).toISOString().slice(0,7);
